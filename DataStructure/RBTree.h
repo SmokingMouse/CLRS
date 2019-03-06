@@ -4,6 +4,7 @@
 namespace CLRS {
 	namespace DataStructure {
 		using std::shared_ptr;
+		using std::weak_ptr;
 
 		extern const bool BLACK;
 		extern const bool RED;
@@ -19,11 +20,16 @@ namespace CLRS {
 			RBNode(const KeyType& v):key_(v),parent_(0),left_(0),right_(0),color_(RED){}
 			RBNode(const KeyType& v, Color c) :key_(v), color_(c) ,left_(0),right_(0),parent_(0){}
 
+			~RBNode() {
+				if (!left_) delete left_;
+				if (!right_) delete right_;
+			}
+
 			Color color_;
 			KeyType key_;
-			shared_ptr<RBNode> parent_;
-			shared_ptr<RBNode> left_;
-			shared_ptr<RBNode> right_;
+			RBNode* parent_;
+			RBNode* left_;
+			RBNode* right_;
 		};
 
 		template<class Node>
@@ -35,21 +41,21 @@ namespace CLRS {
 
 			RBTree():root_(NULL){}
 			RBTree(Compare compare):compare_(compare){}
+			~RBTree() { delete root_; }
 
-
-			shared_ptr<Node> Search(const KeyType& key) {
+			Node* Search(const KeyType& key) {
 				return search_(key, root_);
 			}
 
 			void Insert(const KeyType& key) {
-				shared_ptr<Node> p;
-				shared_ptr<Node> insertPlace = root_;
+				Node* p = NULL;
+				Node* insertPlace = root_;
 				while (insertPlace) {
 					p = insertPlace;
 					if (compare_(key, insertPlace->key_)) insertPlace = insertPlace->left_;
 					else insertPlace = insertPlace->right_;
 				}
-				insertPlace = std::make_shared<Node>(key);
+				insertPlace = new Node(key);
 				if (p)
 				{
 					if (compare_(key, p->key_)) p->left_ = insertPlace;
@@ -60,16 +66,16 @@ namespace CLRS {
 				Insert_Adjust(insertPlace);
 			}
 
-			void Insert_Adjust(shared_ptr<Node> ptr) {
+			void Insert_Adjust(Node* ptr) {
 				if (ptr->color_ == BLACK) return;
-				shared_ptr<Node> p = ptr->parent_;
+				Node* p = ptr->parent_;
 				if (!p) {
 					ptr->color_ = BLACK;
 					return;
 				}
 				if (p->color_ == BLACK) return;
-				shared_ptr<Node> g_p = p->parent_;
-				shared_ptr<Node> uncle = p == g_p->left_ ? g_p->right_ : g_p->left_;
+				Node* g_p = p->parent_;
+				Node* uncle = p == g_p->left_ ? g_p->right_ : g_p->left_;
 							//p == RED, which means p->parent can be null.
 				if (uncle && uncle->color_ == RED) {
 					p->color_ = BLACK;
@@ -102,9 +108,9 @@ namespace CLRS {
 				}
 			}
 
-			void LeftRotate(shared_ptr<Node> ptr) {
+			void LeftRotate(Node* ptr) {
 				if (!ptr || !ptr->parent_) return;
-				shared_ptr<Node> p = ptr->parent_;
+				Node* p = ptr->parent_;
 				p->right_ = ptr->left_;
 				if (ptr->left_) ptr->left_->parent_ = p;
 				ptr->parent_ = p->parent_;
@@ -121,9 +127,9 @@ namespace CLRS {
 				p->parent_ = ptr;
 			}
 
-			void RightRotate(shared_ptr<Node> ptr) {
+			void RightRotate(Node* ptr) {
 				if (!ptr || !ptr->parent_) return;
-				shared_ptr<Node> p = ptr->parent_;
+				Node* p = ptr->parent_;
 				p->left_ = ptr->right_;
 				if (ptr->right_) ptr->right_->parent_ = p;
 				ptr->parent_ = p->parent_;
@@ -140,9 +146,9 @@ namespace CLRS {
 				p->parent_ = ptr;
 			}
 
-			void Delete(shared_ptr<Node> ptr) {
+			void Delete(Node* ptr) {
 				if (!ptr) return;
-				shared_ptr<Node> toFix;
+				Node* toFix;
 				Color original_color = ptr->color_;
 				if (!ptr->left_) {
 					transplant(ptr, ptr->right_);
@@ -153,7 +159,7 @@ namespace CLRS {
 					toFix = ptr->left_;
 				}
 				else {
-					shared_ptr<Node> next = TreeMinmum(ptr->right_);
+					Node* next = TreeMinmum(ptr->right_);
 					original_color = next->color_;
 					toFix = next->right_;
 					if (next->parent_ != ptr) {
@@ -167,12 +173,14 @@ namespace CLRS {
 					next->color_ = ptr->color_;
 				}
 				if (original_color == BLACK) Delete_Adjust(toFix);
+				ptr->left_ = NULL; ptr->right_ = NULL;
+				delete ptr;
 			}
 
-			void Delete_Adjust(shared_ptr<Node> fixNode) {
+			void Delete_Adjust(Node* fixNode) {
 				while (fixNode != root_ && fixNode->color_ == BLACK) {
 					if (fixNode == fixNode->parent_->left_) {
-						shared_ptr<Node> brother = fixNode->parent_->right_;
+						Node* brother = fixNode->parent_->right_;
 									// The brother can't be Null, otherwise black left > black right.
 						if (brother->color_ == RED) {
 							brother->color_ = brother->parent_->color_;
@@ -202,7 +210,7 @@ namespace CLRS {
 						}
 					}
 					else {
-						shared_ptr<Node> brother = fixNode->parent_->left_;
+						Node* brother = fixNode->parent_->left_;
 						if (brother->color_ == RED) {
 							brother->color_ = brother->parent_->color_;
 							brother->parent_->color_ = RED;
@@ -234,19 +242,19 @@ namespace CLRS {
 				fixNode->color_ = BLACK;
 			}
 
-			void transplant(shared_ptr<Node> p, shared_ptr<Node> q) {
+			void transplant(Node* p, Node* q) {
 				if (p == root_) root_ = q;
 				else if (p == p->parent_->left_) p->parent_->left_ = q;
 				else p->parent_->right_ = q;
 				if (q) q->parent_ = p->parent_;
 			}
 
-			shared_ptr<Node> TreeMinmum(shared_ptr<Node> root) {
+			Node* TreeMinmum(Node* root) {
 				if (!root||!root->left_) return root;
 				return TreeMinmum(root->left_);
 			}
 		
-			shared_ptr<Node> search_(const KeyType& key, const shared_ptr<Node> root) {
+			Node* search_(const KeyType& key, Node* root) {
 				if (!root) return NULL;
 				if (root->key_ == key) return root;
 				else if (compare_(key, root->key_)) return search_(key, root->left_);
@@ -254,7 +262,7 @@ namespace CLRS {
 			}
 
 		private:
-			shared_ptr<Node> root_;
+			Node* root_;
 			Compare compare_;
 		};
 
